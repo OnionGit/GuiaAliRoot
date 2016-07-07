@@ -1,0 +1,302 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{verbatimbox}
+\usepackage{float}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage[most]{tcolorbox}
+
+
+\title{\bf{Gu\'ia de AliRoot}}
+\author{Sergio Best}
+\date{\it{2016}}
+\begin{document}
+    \begin{figure}
+    \begin{center}
+    \includegraphics[scale=1.0]{alilogo.jpg}
+    \end{center}
+    \end{figure}
+\maketitle
+
+
+Al momento de escribir esta gu\'ia, sali\'o un nuevo m\'etodo para instalar AliRoot. El m\'etodo es m\'as sencillo que el anterior, pero vale la pena saber por qu\'e es m\'as sencillo.\\
+AliRoot se construye sobre varios otros programas para hacer las simulaciones, los MonteCarlos, la geometr\'ia, tales como Root y GEANT. Antes, para instalarlo, era necesario instalar todas estas dependencias. Hab\'ia libertad para escoger las versiones de las dependencias, pero algunas combinaciones eran recomendadas por los desarrolladores ya que estaba probado que funcionaban.Era un dolor de cabeza.\\
+El nuevo m\'etodo de AliBuild instala directamente las dependencias necesarias y las maneja, actualiza, de acuerdo a como vayan cambiando las cosas, evitando as\'i los problemas de dependencias. Esto es muy \'util para olvidarte de los programas detr\'as y concentrarte en trabajar con AliRoot. Si m\'as adelante deseas probar cosas nuevas, AliBuild te da la opci\'on de especificar las dependencias a mano.\\
+La mejor gu\'ia para instalar AliRoot es la de Dario Berzano. Esta gu\'ia fue hecha en el 2016, as\'i que el m\'etodo de instalaci\'on puede haber cambiado. De todas formas es bueno revisar su p\'agina. \url{https://dberzano.github.io/alice/install-aliroot/}. En caso la p\'agina ya no est\'e disponible por alguna raz\'on, har\'e un pequeño resumen de como instalar Aliroot con AliBuild, pero si est\'a la p\'agina de Dario a\'un, conviene m\'as seguir su gu\'ia de instalaci\'on. Tambi\'en hay una gu\'ia sobre el uso de Git que es bastante \'util aprender para manejar las carpetas de AliRoot.
+
+\section{Instalando AliRoot}
+
+Primero necesitas Pip. Un programa para instalar y manejar paquetes de Python. Si aun no lo tienes o no est\'as seguro de si lo tienes escribe en terminal.
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+sudo apt-get install python-pip
+\end{verbatim}
+\end{tcolorbox}
+O su equivalente en tu distribuci\'on de Linux. Luego usas pip para instalar AliBuild.
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+pip install alibuild
+\end{verbatim}
+\end{tcolorbox}
+Luego creamos una nueva carpeta e instalamos AliRoot y todas sus dependencias all\'i.
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+mkdir $HOME/alice && cd $HOME/alice
+aliBuild init AliRoot,AliPhysics -z ali-master
+cd ali-master
+aliBuild -z -w ../sw -d build AliPhysics
+alienv enter AliPhysics/latest-ali-master
+\end{verbatim}
+\end{tcolorbox}
+
+Para simplicar m\'as las cosas, pondremos en el .bashrc las siguientes l\'ineas
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+ALICE_WORK_DIR=$HOME/alice/sw
+eval "`alienv shell-helper`"
+\end{verbatim}
+\end{tcolorbox}
+
+Una vez instalado todo y configurado el .bashrc. Para entrar en entorno AliRoot basta con escribir en terminal.
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+alienv load
+\end{verbatim}
+\end{tcolorbox}
+Esto carga las variables de entorno necesarias y te pone en modo AliRoot. Para salir puedes usar la siguiente l\'inea.
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+alienv unload
+\end{verbatim}
+\end{tcolorbox}
+
+\newpage
+
+\section{Configuraci\'on}
+
+Aqu\'i definimos varios par\'ametros que utilizaremos m\'as adelante en la simulaci\'on. Todo esto se encuentra definido en el Config.C. Vamos a revisar uno de estos c\'odigos para identificar qu\'e par\'ametros se definen.
+
+\subsection{Config.C}
+
+Trabajaremos con el Config.C del MFT. En AliRoot esto se encuentra en la carpeta "aliroot/master/inst/MFT/". Hay una copia del archivo en la carpeta del Git.
+Solo pondr\'e partes del c\'odigo para poder explicarlo mejor.
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  LoadLibs();
+
+  new TGeant3TGeo("C++ Interface to Geant3");
+
+  // Create the output file
+
+  AliRunLoader* rl=0x0;
+
+  printf("Config.C: Creating Run Loader ...");
+  rl = AliRunLoader::Open("galice.root", 
+  AliConfig::GetDefaultEventFolderName(), "recreate");
+  if (rl == 0x0) {gAlice->Fatal("Config.C",
+  "Can not instatiate the Run Loader");
+    return;
+  }
+  rl->SetCompressionLevel(2);
+  rl->SetNumberOfEventsPerFile(1000);
+  gAlice->SetRunLoader(rl);
+\end{verbatim}
+\end{tcolorbox}
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  TVirtualMCDecayer *decayer = new AliDecayerPythia();
+  decayer->SetForceDecay(kAll);
+  decayer->Init();
+  gMC->SetExternalDecayer(decayer);
+\end{verbatim}
+\end{tcolorbox}
+Primero hemos cargado las librer\'ias con LoadLibs, puedes revisar la funci\'on completa que se encuentra en la \'ultima parte del c\'odigo. Con TGeant3TGeo inicializamos el objeto donde entrar\'a la geometr\'ia del detector. AliRunLoader que leer\'a el galice.root que es donde se encuentra la informaci\'on necesaria para la simulaci\'on. Lo siguiente importante es en SetNumberOfEventsPerFile. Aqu\'i pondras cu\'antos eventos entran en cada archivo. Cuidado. Si este n\'umero es muy bajo, saldr\'an demasiados archivos. Por el contrario, si es muy grande, ser\'a dif\'icil manejarlos. Ad\'aptalo a tus necesidades.\\
+En este caso no est\'an seteando una semilla para el generador de n\'umeros aleatorios, pero es bueno colocarla. Con gRandom-$>$SetSeed(0) toma la hora del reloj de la computadora. Si quieres comparar con otra computadora, pon en ambas el mismo seed.\\
+Finalmente en el \'ultimo recuadro definen e inicializan el generador de decaimientos, Pythia. Añadi\'endolo al generador de Monte Carlo.\\
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  gMC->SetProcess("DCAY",1);
+  gMC->SetProcess("PAIR",1);
+  gMC->SetProcess("COMP",1);
+  gMC->SetProcess("PHOT",1);
+  gMC->SetProcess("PFIS",0);
+  gMC->SetProcess("DRAY",0);
+  gMC->SetProcess("ANNI",1);
+  gMC->SetProcess("BREM",1);
+  gMC->SetProcess("MUNU",1);
+  gMC->SetProcess("CKOV",1);
+  gMC->SetProcess("HADR",1);
+  gMC->SetProcess("LOSS",2);
+  gMC->SetProcess("MULS",1);
+  gMC->SetProcess("RAYL",1);
+\end{verbatim}
+\end{tcolorbox}
+Aqu\'i se definen qu\'e procesos estar\'an involucradas en la simulaci\'on. Decayment, Pair Production, Annihilation, Cherenkov, etc.
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  Int_t iABSO  = 1;
+  Int_t iDIPO  = 1;
+  Int_t iHALL  = 1;
+  Int_t iMUON  = 1;
+  Int_t iPIPE  = 1;
+  Int_t iSHIL  = 1;
+  Int_t iT0    = 0;
+  Int_t iVZERO = 1;
+  Int_t iMFT   = 1;
+  Int_t iEMCAL = 0;
+  Int_t iFMD   = 0;
+  Int_t iFRAME = 0;
+  Int_t iITS   = 0;
+  Int_t iTOF   = 0;
+  Int_t iTPC   = 0;
+  Int_t iTRD   = 0;
+  Int_t iZDC   = 0;
+\end{verbatim}
+\end{tcolorbox}
+Aqu\'i se definen qu\'e detectores estar\'an involucradas en la simulaci\'on.\\
+
+\newpage
+\section{Simulaci\'on}
+
+Originalmente en la simulaci\'on tenemos toda la informaci\'on de qu\'e part\'iculas pasaron por qu\'e sitios. Pero eso no es lo que medimos realmente con un detector, as\'i que la data que obtengamos de la simulaci\'on debemos transformarla a informaci\'on que un detector nos puede dar. Vamos a perder informaci\'on en el proceso, pero est\'a bien, porque en la vida real, un detector pierde mucha informaci\'on de los eventos que ocurren en su interior. La informaci\'on pasa por los siguientes pasos. Cada paso se puede encontrar como archivos despu\'es de la simulaci\'on.
+
+\subsection{Kinematics}
+
+Aqu\'i se almacenan todas las part\'iculas generadas durante la simulaci\'on. La informaci\'on est\'a completa en este paso.
+
+\subsection{Hits}
+
+Ahora se simula el paso de las part\'iculas por las piezas del detector usando GEANT. Cuando una part\'icula atraviesa un material, deposita energ\'ia que es lo que se mide. Se almacena la informaci\'on de la energ\'ia depositada, posici\'on, tiempo y part\'icula que impact\'o.
+
+\subsection{SDigits}
+
+A pesar de su nombre, este paso aun no esta digitalizado. Solo se suma la energ\'ia depositada en una celda del detector. Aqu\'i perdemos informaci\'on de los hits individuales que golpearon la celda. Tal como en la vida real.
+
+\subsection{Digits}
+
+Ahora, el detector no va a decirte: "Depositaron 3 Joules de energ\'ia aqu\'i". El detector solo pasa informaci\'on en 0's y 1's. La energ\'ia depositada se traduce a un voltaje (un valor anal\'ogico) que luego se pasa a un valor digital usando un ADC (Analogue to Digital Converter). Ciertas cosas a tomar en cuenta: La electr\'onica real produce ruido de fondo, esto se agrega a la data en este punto. Tambi\'en, si una señal es muy d\'ebil, se elimina.
+
+\subsection{Raw Data}
+
+M\'as all\'a de eso, un detector trabaja con ventanas de tiempo. As\'i que los Digits se organizan en conjuntos por el tiempo en que ocurrieron. Este paso se puede obviar.
+
+\subsection{runSimulation.C}
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  AliSimulation *simulator = new AliSimulation(config);
+  TDatime dt;
+  UInt_t seed = dt.Get();
+  simulator->SetSeed(seed);
+  simulator->SetRunNumber(runNumber);
+  simulator->SetTriggerConfig("MUON");
+  simulator->SetMakeDigits("MUON MFT");
+  simulator->SetMakeSDigits("MUON MFT");
+\end{verbatim}
+\end{tcolorbox}
+
+Aqu\'i damos la configuraci\'on al simulador, definimos la semilla con la fecha y configuramos el n\'umero del Run. Adem\'as, de acuerdo a qu\'e detector sea, se convierte a Digits y SDigits de forma distitna. Recuerda que cada detector tiene sus propias condiciones de activaci\'on y ruido de electr\'onica.
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  TStopwatch timer;
+  timer.Start();
+  simulator->Run(nevents);
+  timer.Stop();
+  timer.Print();
+\end{verbatim}
+\end{tcolorbox}
+La mayor parte es solo para saber cu\'anto tiempo le toma al simulador hacer todo, pero lo importante est\'a en Run(nevents). Este es el n\'umero de eventos que generaras. Ten en cuenta la capacidad de procesamiento de tu computadora y cu\'anto tiempo tienes disponible.
+
+\newpage
+
+\section{Reconstrucci\'on}
+
+Ahora vamos a tomar el camino inverso y veremos si con los Digits o Raw Data podemos reconstruir la identidad de las part\'iculas incidentes.\\
+Para empezar a reconstruir, AliReconstruction forma clusters de Digits. Cuando una part\'icula pasa por un material, activa varias celdas. Todas estas se pueden agrupar por cercan\'ia espacial y temporal. Luego cada cluster tiene caracter\'isticas tales como la energ\'ia total, que corresponder\'ia a la energ\'ia entregada por la part\'icula incidente, un punto representativo de impacto, qu\'e tan esparcida est\'a la forma del cluster. Todas estas cosas nos dan idea de las caracter\'isticas de lo que impact\'o a nuestro detector.
+Toda esta informaci\'on se guarda en los RecPoints.\\
+Luego se reconstruyen, a partir de los clusters, las part\'iculas originales. \\
+Todo esto se ejecuta usando una macro de reconstrucci\'on que veremos a continuaci\'on. Tras finalizar, el output ser\'a un archivo ESD el cual contiene las part\'iculas reconstruidas. Este es el archivo que analizaremos.
+
+\subsection{runReconstruction.C}
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  AliReconstruction *reco = new AliReconstruction("galice.root");
+
+  // switch off cleanESD
+  reco->SetCleanESD(kFALSE);
+\end{verbatim}
+\end{tcolorbox}
+
+Esta macro se parece mucho a la de simulaci\'on. La \'unica diferencia es que en este caso cargamos el galice.root. Pero lo importante es que generaremos el ESD, recuerda que aqu\'i estar\'a la informaci\'on de las part\'iculas reconstruidas.
+
+
+\newpage
+\section{Análisis de datos}
+
+Analizaremos de la misma forma un ejemplo de la misma carpeta.
+
+\subsection{RunAnalysisTaskMFTExample.C}
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
+  if (mgr) delete mgr;
+  mgr = new AliAnalysisManager("AM","Analysis Manager");
+\end{verbatim}
+\end{tcolorbox}
+El encargado del an\'alisis ser\'a el AliAnalysisManager.
+
+
+\begin{tcolorbox}[breakable]
+\begin{verbatim}
+  TStopwatch timer;
+  timer.Start();
+  mgr->InitAnalysis();
+  mgr->PrintStatus();
+  
+  if (!strcmp(runType,"grid")) {
+    printf("Starting MFT analysis on the grid");
+    mgr->StartAnalysis("grid");
+  }
+
+  else if (!strcmp(runType,"local")) {
+    printf("Starting MFT analysis locally");
+    mgr->StartAnalysis("local", GetInputLocalData());
+  }
+\end{verbatim}
+\end{tcolorbox}
+Solo queda inicializarlo, darle los par\'ametros necesarios y dejar que analice nuestra reconstrucci\'on de la simulaci\'on. Esto es para poder leer la reconstrucci\'on que se ha hecho a partir del ESD.
+
+\begin{thebibliography}{9}
+
+\bibitem{CERN}
+  Alice Software Installation,
+  \emph{\url{https://dberzano.github.io/alice/install-aliroot/}}
+  Dario Berzano,
+  2016
+  
+  \bibitem{CERN}
+  Alice Offline Manual,
+  \emph{\url{http://aliweb.cern.ch/Offline/AliRoot/Manual.html}}
+  ALICE@CERN,
+  2011
+
+  \bibitem{CERN}
+  EMCal Beginners,
+  \emph{\url{http://aliweb.cern.ch/secure/Offline/sites/aliceinfo.cern.ch.secure.Offline/files/uploads/EMCAL/EMCal_Beginners.pdf}}
+  Gustavo Conesa Balbastre,
+  2010
+
+\end{thebibliography}
+
+\end{document}
+
